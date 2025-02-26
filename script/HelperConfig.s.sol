@@ -9,6 +9,11 @@ error HelperConfig__InvalidChainId();
 abstract contract CodeConstraints {
     uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
     uint256 public constant LOCAL_CHAIN_ID = 31337;
+
+    /* VRF Mock Values */
+    uint96 public constant MOCK_BASE_FEE = 0.25 ether;
+    uint96 public constant MOCK_GAS_PRICE_LINK = 1e9;
+    int256 public constant MOCK_WEI_PER_UNIT_LINK = 4e15;
 }
 
 contract HelperConfig is Script, CodeConstraints{
@@ -26,6 +31,7 @@ contract HelperConfig is Script, CodeConstraints{
 
     constructor() {
         networkConfigs[ETH_SEPOLIA_CHAIN_ID] = getSepoliaEthConfig();
+        networkConfigs[LOCAL_CHAIN_ID] = getLocalConfig();
     }
 
     function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {
@@ -50,7 +56,7 @@ contract HelperConfig is Script, CodeConstraints{
         });
     }
 
-    function getConfigByChainId(uint256 chainId) public view returns (NetworkConfig memory) {
+    function getConfigByChainId(uint256 chainId) public returns (NetworkConfig memory) {
         if (networkConfigs[chainId].vrfCoordinator != address(0)) {
             return networkConfigs[chainId];
         }
@@ -62,32 +68,32 @@ contract HelperConfig is Script, CodeConstraints{
         }
     }
 
-    function getOrCreateAnvilEthConfig() public view returns (NetworkConfig memory anvilNetworkConfig) {
+    function getConfig() public returns (NetworkConfig memory) {
+        return getConfigByChainId(block.chainid);
+    }
+
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
         // Check to see if we set an active network config
         if (activeNetworkConfig.vrfCoordinator != address(0)) {
             return activeNetworkConfig;
         }
-    
-        /* VRF Mock Values */
-        uint96 public constant MOCK_BASE_FEE = 0.25 ether;
-        uint96 public constant MOCK_GAS_PRICE_LINK = 1e9;
-        int256 public constant MOCK_WEI_PER_UNIT_LINK = 4e15;
-
         vm.startBroadcast();
         VRFCoordinatorV2_5Mock vrfCoordinatorMock = new VRFCoordinatorV2_5Mock(
             MOCK_BASE_FEE,
             MOCK_GAS_PRICE_LINK,
-            MOCK_WEI_PER_UNIT_LINK,
+            MOCK_WEI_PER_UNIT_LINK
         );
         vm.stopBroadcast();
     
-        return NetworkConfig({
+        activeNetworkConfig = NetworkConfig({
             entranceFee: 0.01 ether,
             interval: 30,
             vrfCoordinator: address(vrfCoordinatorMock),
             gasLane: "",
             subscriptionId: 0,
-            callbackGasLimit: 500_000,
+            callbackGasLimit: 500_000
         });
+
+        return activeNetworkConfig;
     }
 }
