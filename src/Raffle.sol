@@ -74,12 +74,13 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     /** Events */
     event EnteredRaffle(address indexed player);
     event PickedWinner(address indexed winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     /** Constructor */
     constructor(uint256 subscriptionId, bytes32 gasLane, uint256 interval, uint256 entranceFee, uint32 callbackGasLimit, address vrfCoordinatorV2) VRFConsumerBaseV2Plus(vrfCoordinatorV2) {
-        i_subscriptionId = subscriptionId;
         i_gasLane = gasLane;
         i_interval = interval;
+        i_subscriptionId = subscriptionId;
         i_entranceFee = entranceFee;
         s_raffleState = RaffleState.OPEN;
         s_lastTimeStamp = block.timestamp;
@@ -108,8 +109,6 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     function checkUpkeep(bytes memory /* checkData */) public view returns(bool upkeepNeeded, bytes memory /* performData */) {
         bool isOpen = RaffleState.OPEN == s_raffleState;
         bool timePassed = ((block.timestamp - s_lastTimeStamp) >= i_interval);
-        console.log("interval?: ", block.timestamp - s_lastTimeStamp);
-        console.log("interval!: ", i_interval);
         bool hasPlayers = s_players.length > 0;
         bool hasBalance = address(this).balance > 0;
         upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
@@ -125,7 +124,7 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
 
         s_raffleState = RaffleState.CALCULATING;
             
-        uint256 requestId = s_vrfCoordinator.requestRandomWords(VRFV2PlusClient.RandomWordsRequest({
+        VRFV2PlusClient.RandomWordsRequest memory request = (VRFV2PlusClient.RandomWordsRequest({
             keyHash: i_gasLane,
             subId: i_subscriptionId,
             requestConfirmations: REQUEST_CONFIRMATIONS,
@@ -137,6 +136,8 @@ contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
                 )
             })
         );
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(request);
+        emit RequestedRaffleWinner(requestId);
     }   
 
     function fulfillRandomWords(uint256 /* requestId */, uint256[] calldata randomWords) internal override {
